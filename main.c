@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
     FILE *fp;
     char url[255];
     sprintf(url, "http://api.thesubdb.com/?action=download&hash=%s&language=en", md5string);
-    char *user_agent = "SubDB/1.0 (Tausen/0.1; http://github.com/nowebsite/srsly)";
+    char *user_agent = "SubDB/1.0 (srtdownloader/0.1; https://github.com/tausen/srtdownloader)";
     curl = curl_easy_init();
     if (curl) {
         printf("Downloading subtitle to %s... ", fname);
