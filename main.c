@@ -16,12 +16,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
 #include <curl/curl.h>
 #include <curl/easy.h>
 
+#include "opensubtitles.h"
 #include "md5.h"
 
 #define READSIZE 64*1024L
@@ -75,8 +77,21 @@ char *remove_ext (char* mystr, char dot, char sep) {
 int main(int argc, char *argv[]) {
 
     if (argc < 2) {
-        printf("Not enough arguments!\nUsage: srtdownloader <videofile>\n");
+        printf("Not enough arguments!\nUsage: srtdownloader <videofile> [source]\n");
+        printf("Where source is optional and one of: o,s for opensubtitles or subdb");
         return 0;
+    }
+
+    int provider = -1;
+    if (argc > 2) {
+        if (argv[2][0] == 's') {
+            provider = 1;
+        } else if (argv[2][0] == 'o') {
+            provider = 2;
+        } else {
+            printf("Unknown source '%s'\n", argv[2]);
+            return 1;
+        }
     }
 
     /* Open the file for reading */
@@ -87,8 +102,13 @@ int main(int argc, char *argv[]) {
     }
 
     /* Get the full filename and add srt extension */
-    char *fname = remove_ext (argv[1], '.', '/');
+    char *fname = remove_ext(argv[1], '.', '/');
     sprintf(fname, "%s.srt", fname);
+
+    bool success = false;
+
+    /* todo: indent (lets not clutter git history just yet..) */
+    if (provider < 0 || provider == 1) {
     
     /* Put the first and last 64 kbyte of the file in buffer */
     uint8_t buffer[READSIZE*2];
@@ -118,15 +138,26 @@ int main(int argc, char *argv[]) {
     char *user_agent = "SubDB/1.0 (srtdownloader/0.1; https://github.com/tausen/srtdownloader)";
     curl = curl_easy_init();
     if (curl) {
-        printf("Downloading subtitle to %s... ", fname);
+        printf("Downloading subtitle from thesubdb to %s... ", fname);
         fp = fopen(fname,"wb");
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, user_agent);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
         CURLcode res = curl_easy_perform(curl);
-        if (res == 0) {
-            printf("done\n");
+        if (res == CURLE_OK) {
+            long resp;
+            res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp);
+            if (res != CURLE_OK) {
+                printf("FAILED, could not get response code\n");
+            } else {
+                if (resp != 200) {
+                    printf("FAILED (%li)\n", resp);
+                } else {
+                    printf("done\n");
+                    success = true;
+                }
+            }
         } else {
             printf("FAILED\n");
         }
@@ -135,6 +166,20 @@ int main(int argc, char *argv[]) {
         fclose(fp);
     } else {
         printf("Could not initialize curl - what did you do?\n");
+    }
+
+    } /* if (provider < 0 || provider == 1) */
+
+    if ((provider < 0 && !success) || provider == 2) {
+
+        printf("Downloading subtitle from opensubtitles to %s... ", fname);
+        if (opensubtitles_get(argv[1], fname, 0) < 0) {
+            printf("FAILED\n");
+        } else {
+            printf("done\n");
+            success = true;
+        }
+
     }
 
     free(fname);
