@@ -21,7 +21,6 @@
 struct login_response {
     char *token;
     char *status;
-    double seconds;
 };
 struct login_response *login_response_create();
 void login_response_destroy(struct login_response *lr);
@@ -184,7 +183,6 @@ int parse_login_response(xmlrpc_env *env,
                          xmlrpc_value *resultP,
                          struct login_response *login) {
     char* s;
-    double d;
     xmlrpc_value *key, *value;
     int size = xmlrpc_struct_size(env, resultP);
     if (faultOccured(env))
@@ -205,11 +203,6 @@ int parse_login_response(xmlrpc_env *env,
             *sp = malloc(strlen(s)+1);
             strcpy(i == 0 ? login->token : login->status, s);
             break;
-        case 2:
-            xmlrpc_parse_value(env, value, "d", &d);
-            if (faultOccured(env))
-                return -1;
-            login->seconds = d;
         }
     }
 
@@ -295,6 +288,49 @@ int opensubtitles_get(char *src, char *dest, uint8_t verbosity) {
     int fd = 0;
     FILE *infile = NULL;
 
+    /* try to log in using username and md5hash of password in ~/.srtdownloader */
+    /* format: <username>\n<password hash> */
+    char username[100];
+    char password[100];
+    if (verbosity & 0x1)
+        fprintf(stderr, "Attempting to fetch login credentials... ");
+
+    char filename[100];
+    sprintf(filename, "%s/.srtdownloader", getenv("HOME"));
+    FILE *credentialsfile = fopen(filename, "r");
+    bool fileread = false;
+    if (credentialsfile == NULL) {
+        if (verbosity & 0x1) {
+            fprintf(stderr, "%s not be opened (%s), using anonymous login\n",
+                    filename,
+                    strerror(errno));
+        }
+    } else {
+        /* read username and password from file... */
+        if (fgets(username, sizeof(username), credentialsfile) == NULL ||
+            fgets(password, sizeof(password), credentialsfile) == NULL) {
+
+            if (verbosity & 0x1)
+              fprintf(stderr, " failed reading %s", filename);
+
+        } else {
+            /* remove trailing \n */
+            strtok(username, "\n");
+            strtok(password, "\n");
+
+            fileread = true;
+
+            if (verbosity & 0x1)
+                fprintf(stderr, " success\n");
+        }
+    }
+
+    /* empty strings for anonymous login */
+    if (!fileread) {
+        username[0] = '\0';
+        password[0] = '\0';
+    }
+
     /* compute hash and grab file size */
     if (verbosity & 0x1)
         fprintf(stderr, "Computing hash...");
@@ -330,7 +366,7 @@ int opensubtitles_get(char *src, char *dest, uint8_t verbosity) {
     /* using temp agent for testing until we get our own userAgent... */
     // const char * const userAgent = "srtdownloader v0.1";
     resultP = xmlrpc_client_call(&env, serverUrl, "LogIn", "(ssss)",
-                                 "", "", "eng", "OSTestUserAgentTemp");
+                                 username, password, "eng", "srtdownloader v0.1");
     if (faultOccured(&env)) {
         ret = -1;
         goto errout;
@@ -345,8 +381,8 @@ int opensubtitles_get(char *src, char *dest, uint8_t verbosity) {
 
     if (login->status[0] != '2') {
         fprintf(stderr, "xmlrpc login error, reply:\n");
-        fprintf(stderr, "\ttoken: %s\n\tstatus: %s\n\tseconds: %f\n",
-                login->token, login->status, login->seconds);
+        fprintf(stderr, "\ttoken: %s\n\tstatus: %s\n",
+                login->token, login->status);
         ret = -1;
         goto end;
     }
