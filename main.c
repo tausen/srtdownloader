@@ -76,9 +76,9 @@ char *remove_ext (char* mystr, char dot, char sep) {
 
 int main(int argc, char *argv[]) {
 
-    if (argc < 2) {
-        printf("Not enough arguments!\nUsage: srtdownloader <videofile> [source]\n");
-        printf("Where source is optional and one of: o,s for opensubtitles or subdb");
+    if (argc < 2 || (argc > 1 && strcmp("-h", argv[1]) == 0)) {
+        printf("Not enough arguments\r\nUsage: srtdownloader <videofile> [source]\r\n");
+        printf("Where source is optional and one of: o,s for opensubtitles or thesubdb (default)\r\n");
         return 0;
     }
 
