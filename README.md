@@ -8,7 +8,8 @@ Building
 * Clone the repo
 * To build, you must install
   * libcurl-dev (included in libcurl4-openssl-dev)
-  * libxmlrpc-c3-dev
+  * libxmlrpc-core-c3-dev
+  * libxmlrpc-c++8-dev
   * libarchive-dev
 * make
 * Run srtdownloader for command syntax
