@@ -562,8 +562,6 @@ int opensubtitles_get(char *src, char *dest, uint8_t verbosity) {
     download_response_destroy(download);
     login_response_destroy(login);
     search_response_destroy(result);
-    if (resultP != NULL)
-        xmlrpc_DECREF(resultP);
 
     if (verbosity & 0x2)
         fprintf(stderr, "clean up env\n");
